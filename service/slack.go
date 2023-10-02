@@ -12,11 +12,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/http"
+
 
 	"github.com/slack-go/slack"
 
 	"github.com/erroneousboat/slack-term/components"
 	"github.com/erroneousboat/slack-term/config"
+	"github.com/erroneousboat/slack-term/internal/chttp"
+
 )
 
 type SlackService struct {
@@ -35,7 +39,7 @@ type SlackService struct {
 func NewSlackService(config *config.Config) (*SlackService, error) {
 	svc := &SlackService{
 		Config:      config,
-		Client:      slack.New(config.SlackToken),
+		Client:      slack.New(config.SlackToken, slack.OptionHTTPClient(chttp.New("https://slack.com", chttp.ConvertCookies([]http.Cookie{{Name: "d", Value: config.SlackXoxdToken}})))),
 		UserCache:   make(map[string]string),
 		ThreadCache: make(map[string]string),
 	}
