@@ -3,7 +3,6 @@ package components
 import (
 	"fmt"
 	"html"
-
 	"github.com/erroneousboat/termui"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )

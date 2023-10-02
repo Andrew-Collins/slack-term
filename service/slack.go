@@ -3,8 +3,13 @@ package service
 import (
 	"errors"
 	"fmt"
+	"github.com/erroneousboat/slack-term/components"
+	"github.com/erroneousboat/slack-term/config"
+	"github.com/erroneousboat/slack-term/internal/chttp"
+	"github.com/slack-go/slack"
 	"html"
 	"log"
+	"net/http"
 	"net/url"
 	"regexp"
 	"sort"
@@ -12,15 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"net/http"
-
-
-	"github.com/slack-go/slack"
-
-	"github.com/erroneousboat/slack-term/components"
-	"github.com/erroneousboat/slack-term/config"
-	"github.com/erroneousboat/slack-term/internal/chttp"
-
 )
 
 type SlackService struct {
@@ -79,43 +75,48 @@ func NewSlackService(config *config.Config) (*SlackService, error) {
 }
 
 func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
+
+	log.Println(
+		"Getting Channels",
+	)
+
+	clientParams := slack.GetChannelsInfoParams{
+		ThreadCountsByChannel: true,
+		OrgWideAware:          true,
+		IncludeFileChannels:   true,
+	}
+
+	channels, mpims, ims, err := s.Client.GetClientCounts(&clientParams)
+	if err != nil {
+		return nil, err
+	}
+
+	listParams := slack.GetConversationsParameters{
+		ExcludeArchived: true,
+		Limit:           1000,
+		Types: []string{
+			"public_channel",
+			"private_channel",
+			"im",
+			"mpim",
+		},
+	}
+
 	slackChans := make([]slack.Channel, 0)
 
 	// Initial request
-	initChans, initCur, err := s.Client.GetConversations(
-		&slack.GetConversationsParameters{
-			ExcludeArchived: "true",
-			Limit:           1000,
-			Types: []string{
-				"public_channel",
-				"private_channel",
-				"im",
-				"mpim",
-			},
-		},
-	)
+	initChans, initCur, err := s.Client.GetConversations(&listParams)
 	if err != nil {
 		return nil, err
 	}
 
 	slackChans = append(slackChans, initChans...)
 
+	// time.Sleep(1000 * time.Millisecond)
 	// Paginate over additional channels
 	nextCur := initCur
 	for nextCur != "" {
-		channels, cursor, err := s.Client.GetConversations(
-			&slack.GetConversationsParameters{
-				Cursor:          nextCur,
-				ExcludeArchived: "true",
-				Limit:           1000,
-				Types: []string{
-					"public_channel",
-					"private_channel",
-					"im",
-					"mpim",
-				},
-			},
-		)
+		channels, cursor, err := s.Client.GetConversations(&listParams)
 		if err != nil {
 			return nil, err
 		}
@@ -123,6 +124,44 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 		slackChans = append(slackChans, channels...)
 		nextCur = cursor
 	}
+
+	// slackConvs := make([]slack.Channel, 0)
+	// for _, chn := range slackChans {
+	// 	if (chn.IsChannel || chn.IsGroup) && !chn.IsMember {
+	// 		continue
+	// 	} else if chn.IsMpIM && !chn.IsOpen {
+	// 		continue
+	// 	} else if chn.IsIM {
+	// 		_, ok := s.UserCache[chn.User]
+	// 		if !ok {
+	// 			continue
+	// 		}
+	// 	}
+	// 	if chn.IsChannel {
+	// 		log.Println(
+	// 			"Channel ",
+	// 			chn.Name,
+	// 		)
+	// 		log.Println(
+	// 			"Channel with last read",
+	// 			chn.LastRead,
+	// 			chn.Latest,
+	// 		)
+	// 	}
+	// 	ch, err := s.Client.GetConversationInfo(
+	// 		&slack.GetConversationInfoInput{
+	// 			ChannelID:         chn.ID,
+	// 			IncludeLocale:     true,
+	// 			IncludeNumMembers: true,
+	// 		},
+	// 	)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	//
+	// 	slackConvs = append(slackConvs, *ch)
+	// 	// time.Sleep(1000 * time.Millisecond)
+	// }
 
 	// We're creating tempChan, because we want to be able to
 	// sort the types of channels into buckets
@@ -138,6 +177,10 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 	buckets[2] = make(map[string]*tempChan) // MpIM
 	buckets[3] = make(map[string]*tempChan) // IM
 
+	log.Println(
+		"Sorting Chans",
+	)
+
 	var wg sync.WaitGroup
 	for _, chn := range slackChans {
 		chanItem := s.createChannelItem(chn)
@@ -146,12 +189,24 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 			if !chn.IsMember {
 				continue
 			}
+			active := false
+			for _, ch := range channels {
+				if ch.ID == chn.ID {
+					active = true
+					chanItem.Notification = ch.HasUnreads
+				}
+			}
+			if !active {
+				continue
+			}
+			log.Println(
+				"Channel: ",
+				chn.Name,
+				", Unread: ",
+				chanItem.Notification,
+			)
 
 			chanItem.Type = components.ChannelTypeChannel
-
-			if chn.UnreadCount > 0 {
-				chanItem.Notification = true
-			}
 
 			buckets[0][chn.ID] = &tempChan{
 				channelItem:  chanItem,
@@ -164,34 +219,57 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 				continue
 			}
 
+			log.Println(
+				"Group ",
+				chn.Name,
+			)
+
 			// This is done because MpIM channels are also considered groups
 			if chn.IsMpIM {
 				if !chn.IsOpen {
 					continue
 				}
+				active := false
+				for _, ch := range mpims {
+					if ch.ID == chn.ID {
+						active = true
+						chanItem.Notification = ch.HasUnreads
+					}
+				}
+				if !active {
+					continue
+				}
+				log.Println(
+					"MPIM: ",
+					chn.Name,
+					", Unread: ",
+					chanItem.Notification,
+				)
 
 				chanItem.Type = components.ChannelTypeMpIM
-
-				if chn.UnreadCount > 0 {
-					chanItem.Notification = true
-				}
 
 				buckets[2][chn.ID] = &tempChan{
 					channelItem:  chanItem,
 					slackChannel: chn,
 				}
 			} else {
+				// don't support for now
 
-				chanItem.Type = components.ChannelTypeGroup
-
-				if chn.UnreadCount > 0 {
-					chanItem.Notification = true
-				}
-
-				buckets[1][chn.ID] = &tempChan{
-					channelItem:  chanItem,
-					slackChannel: chn,
-				}
+				// chanItem.Type = components.ChannelTypeGroup
+				//
+				// log.Println(
+				// 	"Group with unread cnt",
+				// 	chn.UnreadCount,
+				// 	chn.UnreadCountDisplay,
+				// )
+				// if chn.UnreadCount > 0 {
+				// 	chanItem.Notification = true
+				// }
+				//
+				// buckets[1][chn.ID] = &tempChan{
+				// 	channelItem:  chanItem,
+				// 	slackChannel: chn,
+				// }
 			}
 		}
 
@@ -204,14 +282,26 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 			if !ok {
 				continue
 			}
+			active := false
+			for _, ch := range ims {
+				if ch.ID == chn.ID {
+					active = true
+					chanItem.Notification = ch.HasUnreads
+				}
+			}
+			if !active {
+				continue
+			}
+			log.Println(
+				"IM: ",
+				chn.Name,
+				", Unread: ",
+				chanItem.Notification,
+			)
 
 			chanItem.Name = name
 			chanItem.Type = components.ChannelTypeIM
 			chanItem.Presence = "away"
-
-			if chn.UnreadCount > 0 {
-				chanItem.Notification = true
-			}
 
 			buckets[3][chn.User] = &tempChan{
 				channelItem:  chanItem,
@@ -273,22 +363,22 @@ func (s *SlackService) SetUserAsActive() {
 func (s *SlackService) MarkAsRead(channelItem components.ChannelItem) {
 	switch channelItem.Type {
 	case components.ChannelTypeChannel:
-		s.Client.SetChannelReadMark(
+		s.Client.MarkConversation(
 			channelItem.ID, fmt.Sprintf("%f",
 				float64(time.Now().Unix())),
 		)
 	case components.ChannelTypeGroup:
-		s.Client.SetGroupReadMark(
+		s.Client.MarkConversation(
 			channelItem.ID, fmt.Sprintf("%f",
 				float64(time.Now().Unix())),
 		)
 	case components.ChannelTypeMpIM:
-		s.Client.MarkIMChannel(
+		s.Client.MarkConversation(
 			channelItem.ID, fmt.Sprintf("%f",
 				float64(time.Now().Unix())),
 		)
 	case components.ChannelTypeIM:
-		s.Client.MarkIMChannel(
+		s.Client.MarkConversation(
 			channelItem.ID, fmt.Sprintf("%f",
 				float64(time.Now().Unix())),
 		)
@@ -321,8 +411,8 @@ func (s *SlackService) SendFile(channelID string, filepath string) error {
 	// https://godoc.org/github.com/nlopes/slack#Client.UploadFile
 	channels := []string{channelID}
 	params := slack.FileUploadParameters{
-		File:          filepath,
-		Channels:        channels,
+		File:     filepath,
+		Channels: channels,
 	}
 	_, err := s.Client.UploadFile(params)
 
@@ -805,9 +895,9 @@ func (s *SlackService) CreateMessageFromMessageEvent(message *slack.MessageEvent
 }
 
 // parseMessage will parse a message string and find and replace:
-//	- emoji's
-//	- mentions
-//	- html unescape
+//   - emoji's
+//   - mentions
+//   - html unescape
 func parseMessage(s *SlackService, msg string) string {
 	if s.Config.Emoji {
 		msg = parseEmoji(msg)
@@ -824,8 +914,9 @@ func parseMessage(s *SlackService, msg string) string {
 // string and replace them with the correct username with and @ symbol
 //
 // Mentions have the following format:
+//
 //	<@U12345|erroneousboat>
-// 	<@U12345>
+//	<@U12345>
 func parseMentions(s *SlackService, msg string) string {
 	r := regexp.MustCompile(`\<@(\w+\|*\w+)\>`)
 

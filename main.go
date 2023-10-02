@@ -79,6 +79,22 @@ func init() {
 
 func main() {
 	// Start terminal user interface
+  fileName := "slack-term.log"
+
+	// open log file
+	logFile, log_err := os.OpenFile(fileName, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+	if log_err != nil {
+		log.Panic(log_err)
+	}
+	defer logFile.Close()
+  // optional: log date-time, filename, and line number
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+
+	// set log out put
+	log.SetOutput(logFile)
+
+  log.Println("Hello")
+
 	err := termui.Init()
 	if err != nil {
 		log.Fatal(err)

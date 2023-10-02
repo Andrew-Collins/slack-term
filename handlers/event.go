@@ -411,6 +411,9 @@ func actionSend(ctx *context.AppContext) {
 		channelItem := ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel]
 		if channelItem.Notification {
 			ctx.Service.MarkAsRead(channelItem)
+      ctx.View.Debug.Println(
+        "clearing chan",
+      )
 			ctx.View.Channels.MarkAsRead(ctx.View.Channels.SelectedChannel)
 		}
 		termui.Render(ctx.View.Channels)
@@ -588,6 +591,9 @@ func actionChangeChannel(ctx *context.AppContext) {
 	channelItem := ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel]
 	if channelItem.Notification {
 		ctx.Service.MarkAsRead(channelItem)
+    ctx.View.Debug.Println(
+      "clearing chan",
+    )
 		ctx.View.Channels.MarkAsRead(ctx.View.Channels.SelectedChannel)
 	}
 
