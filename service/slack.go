@@ -91,6 +91,14 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 		return nil, err
 	}
 
+	prefs, err := s.Client.GetUserPrefs()
+	if err != nil {
+		return nil, err
+	}
+	mutes := strings.Split(prefs.UserPrefs.MutedChannels, ",")
+
+	log.Println("Mutes: ", mutes)
+
 	listParams := slack.GetConversationsParameters{
 		ExcludeArchived: true,
 		Limit:           1000,
@@ -183,9 +191,67 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 
 	var wg sync.WaitGroup
 	for _, chn := range slackChans {
+		// Ignore if muted
+		mute := false
+		for _, id := range mutes {
+			if chn.ID == id {
+				mute = true
+				break
+			}
+		}
+		if mute {
+			continue
+		}
 		chanItem := s.createChannelItem(chn)
+		if chn.IsMpIM {
+			if !chn.IsMember {
+				continue
+			}
+			active := false
+			for _, ch := range mpims {
+				if ch.ID == chn.ID {
+					active = true
+					chanItem.Notification = ch.HasUnreads
+					chanItem.Latest = ch.Latest
+				}
+			}
+			if !active {
+				continue
+			}
+			log.Println(
+				"MPIM: ",
+				chn.Name,
+				", Unread: ",
+				chanItem.Notification,
+			)
 
-		if chn.IsChannel {
+			chanItem.Type = components.ChannelTypeMpIM
+
+			buckets[2][chn.ID] = &tempChan{
+				channelItem:  chanItem,
+				slackChannel: chn,
+			}
+			// } else {
+			// don't support for now
+
+			// chanItem.Type = components.ChannelTypeGroup
+			//
+			// log.Println(
+			// 	"Group with unread cnt",
+			// 	chn.UnreadCount,
+			// 	chn.UnreadCountDisplay,
+			// )
+			// if chn.UnreadCount > 0 {
+			// 	chanItem.Notification = true
+			// }
+			//
+			// buckets[1][chn.ID] = &tempChan{
+			// 	channelItem:  chanItem,
+			// 	slackChannel: chn,
+			// }
+			// }
+
+		} else if chn.IsChannel {
 			if !chn.IsMember {
 				continue
 			}
@@ -201,6 +267,8 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 			}
 			log.Println(
 				"Channel: ",
+				chn.ID,
+				" ",
 				chn.Name,
 				", Unread: ",
 				chanItem.Notification,
@@ -212,70 +280,8 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 				channelItem:  chanItem,
 				slackChannel: chn,
 			}
-		}
-
-		if chn.IsGroup {
-			if !chn.IsMember {
-				continue
-			}
-
-			log.Println(
-				"Group ",
-				chn.Name,
-			)
-
-			// This is done because MpIM channels are also considered groups
-			if chn.IsMpIM {
-				if !chn.IsOpen {
-					continue
-				}
-				active := false
-				for _, ch := range mpims {
-					if ch.ID == chn.ID {
-						active = true
-						chanItem.Notification = ch.HasUnreads
-					}
-				}
-				if !active {
-					continue
-				}
-				log.Println(
-					"MPIM: ",
-					chn.Name,
-					", Unread: ",
-					chanItem.Notification,
-				)
-
-				chanItem.Type = components.ChannelTypeMpIM
-
-				buckets[2][chn.ID] = &tempChan{
-					channelItem:  chanItem,
-					slackChannel: chn,
-				}
-			} else {
-				// don't support for now
-
-				// chanItem.Type = components.ChannelTypeGroup
-				//
-				// log.Println(
-				// 	"Group with unread cnt",
-				// 	chn.UnreadCount,
-				// 	chn.UnreadCountDisplay,
-				// )
-				// if chn.UnreadCount > 0 {
-				// 	chanItem.Notification = true
-				// }
-				//
-				// buckets[1][chn.ID] = &tempChan{
-				// 	channelItem:  chanItem,
-				// 	slackChannel: chn,
-				// }
-			}
-		}
-
-		// NOTE: user presence is set in the event handler by the function
-		// `actionSetPresenceAll`, that is why we set the presence to away
-		if chn.IsIM {
+			// `actionSetPresenceAll`, that is why we set the presence to away
+		} else if chn.IsIM {
 			// Check if user is deleted, we do this by checking the user id,
 			// and see if we have the user in the UserCache
 			name, ok := s.UserCache[chn.User]
@@ -294,7 +300,7 @@ func (s *SlackService) GetChannels() ([]components.ChannelItem, error) {
 			}
 			log.Println(
 				"IM: ",
-				chn.Name,
+				name,
 				", Unread: ",
 				chanItem.Notification,
 			)
@@ -534,13 +540,14 @@ func (s *SlackService) SendCommand(channelID string, message string) (bool, erro
 // GetMessages will get messages for a channel, group or im channel delimited
 // by a count. It will return the messages, the thread identifiers
 // (as ChannelItem), and and error.
-func (s *SlackService) GetMessages(channelID string, count int) ([]components.Message, []components.ChannelItem, error) {
+func (s *SlackService) GetMessages(channelID string, count int, latest string) ([]components.Message, []components.ChannelItem, error) {
 
 	// https://godoc.org/github.com/nlopes/slack#GetConversationHistoryParameters
 	historyParams := slack.GetConversationHistoryParameters{
+		Latest:    latest,
 		ChannelID: channelID,
 		Limit:     count,
-		Inclusive: false,
+		Inclusive: true,
 	}
 
 	history, err := s.Client.GetConversationHistory(&historyParams)
@@ -667,6 +674,7 @@ func (s *SlackService) CreateMessage(message slack.Message, channelID string) co
 		ID:          message.Timestamp,
 		Messages:    make(map[string]components.Message),
 		Time:        time.Unix(intTime, 0),
+		RawTs:       message.Timestamp,
 		Name:        name,
 		Content:     parseMessage(s, message.Text),
 		StyleTime:   s.Config.Theme.Message.Time,

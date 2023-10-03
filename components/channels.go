@@ -2,9 +2,9 @@ package components
 
 import (
 	"fmt"
-	"html"
 	"github.com/erroneousboat/termui"
 	"github.com/lithammer/fuzzysearch/fuzzy"
+	"html"
 )
 
 const (
@@ -37,6 +37,8 @@ type ChannelItem struct {
 	StylePrefix string
 	StyleIcon   string
 	StyleText   string
+
+	Latest string
 }
 
 // ToString will set the label of the channel, how it will be

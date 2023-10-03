@@ -25,6 +25,7 @@ type Message struct {
 	Messages map[string]Message
 
 	Time    time.Time
+	RawTs   string
 	Thread  string
 	Name    string
 	Content string

@@ -16,6 +16,8 @@ import (
 type Chat struct {
 	List     *termui.List
 	Messages map[string]Message
+	Oldest   time.Time
+	OldestTs string
 	Offset   int
 }
 
@@ -31,6 +33,18 @@ func CreateChatComponent(inputHeight int) *Chat {
 	chat.List.Overflow = "wrap"
 
 	return chat
+}
+
+func (c *Chat) GetOldest() (time.Time, string) {
+	ts := ""
+	time := time.Now()
+	for _, msg := range c.Messages {
+		if time.Compare(msg.Time) > 0 {
+			time = msg.Time
+			ts = msg.RawTs
+		}
+	}
+	return time, ts
 }
 
 // Buffer implements interface termui.Bufferer
@@ -175,11 +189,16 @@ func (c *Chat) SetMessages(messages []Message) {
 	for _, msg := range messages {
 		c.Messages[msg.ID] = msg
 	}
+	c.Oldest, c.OldestTs = c.GetOldest()
 }
 
 // AddMessage adds a single message to Messages
 func (c *Chat) AddMessage(message Message) {
 	c.Messages[message.ID] = message
+	// this shouldn't be necessary
+	if c.Oldest.Compare(message.Time) > 0 {
+		c.OldestTs = message.RawTs
+	}
 }
 
 // AddReply adds a single reply to a parent thread, it also sets
@@ -218,13 +237,17 @@ func (c *Chat) ClearMessages() {
 // start with rendering last item in the list at the maximum y of the Chat
 // pane). Increasing the Offset will thus result in substracting the offset
 // from the len(Chat.Messages).
-func (c *Chat) ScrollUp() {
+func (c *Chat) ScrollUp() (bool, int) {
 	c.Offset = c.Offset + 10
-
+	l := len(c.Messages)
 	// Protect overscrolling
-	if c.Offset > len(c.Messages) {
+	if c.Offset > l {
 		c.Offset = len(c.Messages)
 	}
+	if c.Offset >= 2*l/3 {
+		return true, l
+	}
+	return false, l
 }
 
 // ScrollDown will render the chat messages based on the Offset of the Chat

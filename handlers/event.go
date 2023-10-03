@@ -144,7 +144,8 @@ func messageHandler(ctx *context.AppContext) {
 						// Repopulate message buffer so we don't wipe content repopulating channel list
 						msgs, thr, err := ctx.Service.GetMessages(
 							ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel].ID,
-							ctx.View.Chat.GetMaxItems(),
+							ctx.View.Chat.GetMaxItems()*3,
+							"",
 						)
 						if err != nil {
 							ctx.View.Debug.Println(
@@ -411,9 +412,9 @@ func actionSend(ctx *context.AppContext) {
 		channelItem := ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel]
 		if channelItem.Notification {
 			ctx.Service.MarkAsRead(channelItem)
-      ctx.View.Debug.Println(
-        "clearing chan",
-      )
+			ctx.View.Debug.Println(
+				"clearing chan",
+			)
 			ctx.View.Channels.MarkAsRead(ctx.View.Channels.SelectedChannel)
 		}
 		termui.Render(ctx.View.Channels)
@@ -468,7 +469,8 @@ func actionSearchMode(ctx *context.AppContext) {
 func actionGetMessages(ctx *context.AppContext) {
 	msgs, _, err := ctx.Service.GetMessages(
 		ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel].ID,
-		ctx.View.Chat.GetMaxItems(),
+		ctx.View.Chat.GetMaxItems()*3,
+		"",
 	)
 	if err != nil {
 		termbox.Close()
@@ -554,7 +556,8 @@ func actionChangeChannel(ctx *context.AppContext) {
 	// that fit into the Chat component
 	msgs, threads, err := ctx.Service.GetMessages(
 		ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel].ID,
-		ctx.View.Chat.GetMaxItems(),
+		ctx.View.Chat.GetMaxItems()*3,
+		"",
 	)
 	if err != nil {
 		termbox.Close()
@@ -591,9 +594,9 @@ func actionChangeChannel(ctx *context.AppContext) {
 	channelItem := ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel]
 	if channelItem.Notification {
 		ctx.Service.MarkAsRead(channelItem)
-    ctx.View.Debug.Println(
-      "clearing chan",
-    )
+		ctx.View.Debug.Println(
+			"clearing chan",
+		)
 		ctx.View.Channels.MarkAsRead(ctx.View.Channels.SelectedChannel)
 	}
 
@@ -629,7 +632,8 @@ func actionChangeThread(ctx *context.AppContext) {
 
 		msgs, _, err = ctx.Service.GetMessages(
 			ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel].ID,
-			ctx.View.Chat.GetMaxItems(),
+			ctx.View.Chat.GetMaxItems()*3,
+			"",
 		)
 		if err != nil {
 			termbox.Close()
@@ -735,7 +739,41 @@ func actionSetPresenceAll(ctx *context.AppContext) {
 }
 
 func actionScrollUpChat(ctx *context.AppContext) {
-	ctx.View.Chat.ScrollUp()
+	more, n := ctx.View.Chat.ScrollUp()
+	if more {
+		// >= 2/3 through the available messages
+		// grab more
+		_, oldest := ctx.View.Chat.GetOldest()
+		msgs, threads, err := ctx.Service.GetMessages(
+			ctx.View.Channels.ChannelItems[ctx.View.Channels.SelectedChannel].ID,
+			ctx.View.Chat.GetMaxItems()*3,
+			oldest,
+		)
+		if err != nil {
+			termbox.Close()
+			log.Println(err)
+			os.Exit(0)
+		}
+		log.Println("Adding messages to the chat, curr len: ", n)
+
+		// Add messages to the channel
+		for _, msg := range msgs {
+			ctx.View.Chat.AddMessage(msg)
+		}
+
+		// Set the threads identifiers in the threads pane
+		if len(threads) > 0 {
+			// Make the first thread the current Channel
+			ctx.View.Threads.SetChannels(
+				append(
+					[]components.ChannelItem{ctx.View.Channels.GetSelectedChannel()},
+					threads...,
+				),
+			)
+		}
+	} else {
+		log.Println("Not scrolled enough yet")
+	}
 	termui.Render(ctx.View.Chat)
 }
 
