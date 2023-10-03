@@ -9,7 +9,7 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.0
 	github.com/mattn/go-runewidth v0.0.7
 	github.com/nsf/termbox-go v0.0.0-20191229070316-58d4fcbce2a7
-	github.com/slack-go/slack v0.12.3
+	github.com/slack-go/slack v0.12.4-0.20230829174714-4c00dbda0cd3
 	golang.org/x/net v0.1.0
 )
 
@@ -21,3 +21,5 @@ require (
 	golang.org/x/text v0.4.0 // indirect
 	gopkg.in/yaml.v2 v2.2.4 // indirect
 )
+
+replace github.com/slack-go/slack => github.com/Andrew-Collins/slack v0.12.4-0.20231003035340-c3be0235315d
