@@ -14,11 +14,12 @@ import (
 
 // Chat is the definition of a Chat component
 type Chat struct {
-	List     *termui.List
-	Messages map[string]Message
-	Oldest   time.Time
-	OldestTs string
-	Offset   int
+	List           *termui.List
+	Messages       map[string]Message
+	MessagesSorted []Message
+	Oldest         time.Time
+	OldestTs       string
+	Offset         int
 }
 
 // CreateChatComponent is the constructor for the Chat struct
@@ -50,7 +51,9 @@ func (c *Chat) GetOldest() (time.Time, string) {
 // Buffer implements interface termui.Bufferer
 func (c *Chat) Buffer() termui.Buffer {
 	// Convert Messages into termui.Cell
-	cells := c.MessagesToCells(c.Messages)
+	// TODO
+	// Limit to the messages on screen
+	cells := c.MessagesToCells(c.MessagesSorted)
 
 	// We will create an array of Line structs, this allows us
 	// to more easily render the items in a list. We will range
@@ -188,12 +191,45 @@ func (c *Chat) SetMessages(messages []Message) {
 	c.Offset = 0
 	for _, msg := range messages {
 		c.Messages[msg.ID] = msg
+		c.MessagesSorted = append(c.MessagesSorted, msg)
 	}
 	c.Oldest, c.OldestTs = c.GetOldest()
 }
 
 // AddMessage adds a single message to Messages
 func (c *Chat) AddMessage(message Message) {
+	c.Messages[message.ID] = message
+	t := c.MessagesSorted[len(c.MessagesSorted)-1].Time
+	// prepend as it happened after
+	if t.Compare(message.Time) < 0 {
+		c.MessagesSorted = append(c.MessagesSorted, Message{})
+		copy(c.MessagesSorted[1:], c.MessagesSorted[0:])
+		c.MessagesSorted[0] = message
+	} else {
+		c.MessagesSorted = append(c.MessagesSorted, message)
+	}
+	// this shouldn't be necessary
+	if c.Oldest.Compare(message.Time) > 0 {
+		c.OldestTs = message.RawTs
+	}
+}
+
+// AddMessage adds a single message to Messages
+func (c *Chat) AddReplyMessage(message Message) {
+	t := message.Time
+	ind := -1
+	for i, m := range c.MessagesSorted {
+		if t.Compare(m.Time) > -1 {
+			ind = i
+			break
+		}
+	}
+	if ind < 0 {
+		return
+	}
+	c.MessagesSorted = append(c.MessagesSorted, Message{})
+	copy(c.MessagesSorted[ind+1:], c.MessagesSorted[ind:])
+	c.MessagesSorted[ind] = message
 	c.Messages[message.ID] = message
 	// this shouldn't be necessary
 	if c.Oldest.Compare(message.Time) > 0 {
@@ -228,6 +264,7 @@ func (c *Chat) IsNewThread(parentID string) bool {
 // ClearMessages clear the c.Messages
 func (c *Chat) ClearMessages() {
 	c.Messages = make(map[string]Message)
+	c.MessagesSorted = make([]Message, 0)
 }
 
 // ScrollUp will render the chat messages based on the Offset of the Chat
@@ -237,8 +274,8 @@ func (c *Chat) ClearMessages() {
 // start with rendering last item in the list at the maximum y of the Chat
 // pane). Increasing the Offset will thus result in substracting the offset
 // from the len(Chat.Messages).
-func (c *Chat) ScrollUp() (bool, int) {
-	c.Offset = c.Offset + 10
+func (c *Chat) ScrollUp(n int) (bool, int) {
+	c.Offset = c.Offset + n
 	l := len(c.Messages)
 	// Protect overscrolling
 	if c.Offset > l {
@@ -257,8 +294,8 @@ func (c *Chat) ScrollUp() (bool, int) {
 // start with rendering last item in the list at the maximum y of the Chat
 // pane). Increasing the Offset will thus result in substracting the offset
 // from the len(Chat.Messages).
-func (c *Chat) ScrollDown() {
-	c.Offset = c.Offset - 10
+func (c *Chat) ScrollDown(n int) {
+	c.Offset = c.Offset - n
 
 	// Protect overscrolling
 	if c.Offset < 0 {
@@ -266,27 +303,41 @@ func (c *Chat) ScrollDown() {
 	}
 }
 
+func (c *Chat) MoveCursorTop() {
+	c.Offset = len(c.Messages)
+}
+
+func (c *Chat) MoveCursorBottom() {
+	c.Offset = 0
+}
+
 // SetBorderLabel will set Label of the Chat pane to the specified string
 func (c *Chat) SetBorderLabel(channelName string) {
 	c.List.BorderLabel = channelName
 }
 
+// MessagesToCellsUnsorted is a wrapper around MessagesToCells for unsorted messages
+func (c *Chat) MessagesToCellsUnsorted(msgs map[string]Message) []termui.Cell {
+	sortedMessages := SortMessages(msgs)
+	cells := c.MessagesToCells(sortedMessages)
+	return cells
+}
+
 // MessagesToCells is a wrapper around MessageToCells to use for a slice of
 // of type Message
-func (c *Chat) MessagesToCells(msgs map[string]Message) []termui.Cell {
+func (c *Chat) MessagesToCells(msgs []Message) []termui.Cell {
 	cells := make([]termui.Cell, 0)
-	sortedMessages := SortMessages(msgs)
 
-	for i, msg := range sortedMessages {
+	for i, msg := range msgs {
 		cells = append(cells, c.MessageToCells(msg)...)
 
 		if len(msg.Messages) > 0 {
 			cells = append(cells, termui.Cell{Ch: '\n'})
-			cells = append(cells, c.MessagesToCells(msg.Messages)...)
+			cells = append(cells, c.MessagesToCellsUnsorted(msg.Messages)...)
 		}
 
 		// Add a newline after every message
-		if i < len(sortedMessages)-1 {
+		if i < len(msgs)-1 {
 			cells = append(cells, termui.Cell{Ch: '\n'})
 		}
 	}

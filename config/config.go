@@ -19,15 +19,15 @@ const (
 
 // Config is the definition of a Config struct
 type Config struct {
-	SlackToken   string                `json:"slack_token"`
-	SlackXoxdToken string              `json:"slack_xoxd_token"`
-	Notify       string                `json:"notify"`
-	Emoji        bool                  `json:"emoji"`
-	SidebarWidth int                   `json:"sidebar_width"`
-	MainWidth    int                   `json:"-"`
-	ThreadsWidth int                   `json:"threads_width"`
-	KeyMap       map[string]keyMapping `json:"key_map"`
-	Theme        Theme                 `json:"theme"`
+	SlackToken     string                `json:"slack_token"`
+	SlackXoxdToken string                `json:"slack_xoxd_token"`
+	Notify         string                `json:"notify"`
+	Emoji          bool                  `json:"emoji"`
+	SidebarWidth   int                   `json:"sidebar_width"`
+	MainWidth      int                   `json:"-"`
+	ThreadsWidth   int                   `json:"threads_width"`
+	KeyMap         map[string]keyMapping `json:"key_map"`
+	Theme          Theme                 `json:"theme"`
 }
 
 type keyMapping map[string]string
@@ -115,10 +115,10 @@ func getDefaultConfig() Config {
 				"J":          "thread-down",
 				"<previous>": "chat-up",
 				"C-b":        "chat-up",
-				"C-u":        "chat-up",
+				"C-u":        "chat-page-up",
 				"<next>":     "chat-down",
 				"C-f":        "chat-down",
-				"C-d":        "chat-down",
+				"C-d":        "chat-page-down",
 				"n":          "channel-search-next",
 				"N":          "channel-search-prev",
 				"'":          "channel-jump",

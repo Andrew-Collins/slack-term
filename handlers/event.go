@@ -45,11 +45,17 @@ var actionMap = map[string]func(*context.AppContext){
 	"channel-search-next": actionSearchNextChannels,
 	"channel-search-prev": actionSearchPrevChannels,
 	"channel-jump":        actionJumpChannels,
-	"thread-up":           actionMoveCursorUpThreads,
-	"thread-down":         actionMoveCursorDownThreads,
-	"chat-up":             actionScrollUpChat,
-	"chat-down":           actionScrollDownChat,
-	"help":                actionHelp,
+	"chat-top":            actionMoveCursorTopChat,
+	"chat-bottom":         actionMoveCursorBottomChat,
+	// "chat-search-next":    actionSearchNextChat,
+	// "chat-search-prev":    actionSearchPrevChat,
+	"thread-up":      actionMoveCursorUpThreads,
+	"thread-down":    actionMoveCursorDownThreads,
+	"chat-up":        actionScrollUpChat,
+	"chat-down":      actionScrollDownChat,
+	"chat-page-up":   actionPageUpChat,
+	"chat-page-down": actionPageDownChat,
+	"help":           actionHelp,
 }
 
 // Initialize will start a combination of event handlers and 'background tasks'
@@ -739,7 +745,22 @@ func actionSetPresenceAll(ctx *context.AppContext) {
 }
 
 func actionScrollUpChat(ctx *context.AppContext) {
-	more, n := ctx.View.Chat.ScrollUp()
+	actionScrollUpChatN(ctx, 1)
+}
+
+func actionPageUpChat(ctx *context.AppContext) {
+	actionScrollUpChatN(ctx, 10)
+}
+
+func actionScrollDownChat(ctx *context.AppContext) {
+	actionScrollDownChatN(ctx, 1)
+}
+
+func actionPageDownChat(ctx *context.AppContext) {
+	actionScrollDownChatN(ctx, 10)
+}
+func actionScrollUpChatN(ctx *context.AppContext, n int) {
+	more, n := ctx.View.Chat.ScrollUp(n)
 	if more {
 		// >= 2/3 through the available messages
 		// grab more
@@ -777,10 +798,30 @@ func actionScrollUpChat(ctx *context.AppContext) {
 	termui.Render(ctx.View.Chat)
 }
 
-func actionScrollDownChat(ctx *context.AppContext) {
-	ctx.View.Chat.ScrollDown()
+func actionScrollDownChatN(ctx *context.AppContext, n int) {
+	ctx.View.Chat.ScrollDown(n)
 	termui.Render(ctx.View.Chat)
 }
+
+func actionMoveCursorTopChat(ctx *context.AppContext) {
+	ctx.View.Chat.MoveCursorTop()
+	actionChangeChannel(ctx)
+}
+
+func actionMoveCursorBottomChat(ctx *context.AppContext) {
+	ctx.View.Chat.MoveCursorBottom()
+	actionChangeChannel(ctx)
+}
+
+// func actionSearchNextChat(ctx *context.AppContext) {
+// 	ctx.View.Chat.SearchNext()
+// 	actionChangeChannel(ctx)
+// }
+//
+// func actionSearchPrevChat(ctx *context.AppContext) {
+// 	ctx.View.Chat.SearchPrev()
+// 	actionChangeChannel(ctx)
+// }
 
 func actionHelp(ctx *context.AppContext) {
 	ctx.View.Chat.ClearMessages()
