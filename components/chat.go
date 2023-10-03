@@ -183,6 +183,11 @@ func (c *Chat) GetMaxItems() int {
 	return c.List.InnerBounds().Max.Y - c.List.InnerBounds().Min.Y
 }
 
+// func (c *Chat) SearchNext(message Message) {
+//
+//
+// }
+
 // SetMessages will put the provided messages into the Messages field of the
 // Chat view
 func (c *Chat) SetMessages(messages []Message) {

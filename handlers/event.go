@@ -47,6 +47,7 @@ var actionMap = map[string]func(*context.AppContext){
 	"channel-jump":        actionJumpChannels,
 	"chat-top":            actionMoveCursorTopChat,
 	"chat-bottom":         actionMoveCursorBottomChat,
+	"chat-search":         actionChatSearch,
 	// "chat-search-next":    actionSearchNextChat,
 	// "chat-search-prev":    actionSearchPrevChat,
 	"thread-up":      actionMoveCursorUpThreads,
@@ -243,10 +244,10 @@ func actionKeyEvent(ctx *context.AppContext, ev termbox.Event) {
 			action(ctx)
 		}
 	} else {
-		if ctx.Mode == context.InsertMode && ev.Ch != 0 {
+		if (ctx.Mode == context.InsertMode || ctx.Mode == context.SearchMode) && ev.Ch != 0 {
 			actionInput(ctx.View, ev.Ch)
 		} else if ctx.Mode == context.SearchMode && ev.Ch != 0 {
-			actionSearch(ctx, ev.Ch)
+			actionChanSearch(ctx, ev.Ch)
 		}
 	}
 }
@@ -427,10 +428,30 @@ func actionSend(ctx *context.AppContext) {
 	}
 }
 
-// actionSearch will search through the channels based on the users
+func actionChatSearch(ctx *context.AppContext) {
+	// Only actually search when the time expires
+	term := ctx.View.Input.GetText()
+	ctx.View.Input.Clear()
+	termui.Render(ctx.View.Input)
+	msgs, chanIDs, err := ctx.Service.SearchMessages(term)
+	if err == nil {
+		for i, id := range chanIDs {
+			ind := ctx.View.Channels.FindChannel(id)
+			msgs[i].Name = ctx.View.Channels.ChannelItems[ind].Name + "/" + msgs[i].Name
+		}
+		ctx.View.Chat.SetMessages(msgs)
+	}
+
+	ctx.View.Chat.SetBorderLabel(
+		"Search:'" + term + "'",
+	)
+	termui.Render(ctx.View.Chat)
+}
+
+// actionChanSearch will search through the channels based on the users
 // input. A time is implemented to make sure the actual searching
 // and changing of channels is done when the user's typing is paused.
-func actionSearch(ctx *context.AppContext, key rune) {
+func actionChanSearch(ctx *context.AppContext, key rune) {
 	actionInput(ctx.View, key)
 
 	go func() {
@@ -814,13 +835,13 @@ func actionMoveCursorBottomChat(ctx *context.AppContext) {
 }
 
 // func actionSearchNextChat(ctx *context.AppContext) {
-// 	ctx.View.Chat.SearchNext()
-// 	actionChangeChannel(ctx)
+// ctx.View.Chat.SearchNext()
+// ctx.Service.Client.SearchMessages()
+
 // }
-//
+
 // func actionSearchPrevChat(ctx *context.AppContext) {
-// 	ctx.View.Chat.SearchPrev()
-// 	actionChangeChannel(ctx)
+// ctx.View.Chat.SearchPrev()
 // }
 
 func actionHelp(ctx *context.AppContext) {

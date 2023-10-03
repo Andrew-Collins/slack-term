@@ -1,7 +1,7 @@
 github.com/0xAX/notificator v0.0.0-20171022182052-88d57ee9043b h1:Sn+u6zpXFyfm2X7ruh+z6SJiUVyFg8YElh6HIOhrRCA=
 github.com/0xAX/notificator v0.0.0-20171022182052-88d57ee9043b/go.mod h1:NtXa9WwQsukMHZpjNakTTz0LArxvGYdPA9CjIcUSZ6s=
-github.com/Andrew-Collins/slack v0.12.4-0.20231003035340-c3be0235315d h1:Nu6HgxBuaREYErt9Kn1hdiRjMRObBFymMJgFTfyDwaU=
-github.com/Andrew-Collins/slack v0.12.4-0.20231003035340-c3be0235315d/go.mod h1:hlGi5oXA+Gt+yWTPP0plCdRKmjsDxecdHxYQdlMQKOw=
+github.com/Andrew-Collins/slack v0.12.4-0.20231003124749-c8806ccdda49 h1:56rnYHZq9DKbp0LYML1zGUS1DESjxoa+0lHnmxPPRfw=
+github.com/Andrew-Collins/slack v0.12.4-0.20231003124749-c8806ccdda49/go.mod h1:hlGi5oXA+Gt+yWTPP0plCdRKmjsDxecdHxYQdlMQKOw=
 github.com/OpenPeeDeeP/xdg v0.2.0 h1:xr89rnllbkRkM7SV9Y++FJ8TGkbdkhhBQm5kOkGT7AE=
 github.com/OpenPeeDeeP/xdg v0.2.0/go.mod h1:tMoSueLQlMf0TCldjrJLNIjAc5qAOIcHt5REi88/Ygo=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

@@ -537,6 +537,74 @@ func (s *SlackService) SendCommand(channelID string, message string) (bool, erro
 	return false, nil
 }
 
+func (s *SlackService) SearchMessages(term string) ([]components.Message, []string, error) {
+	prefs := slack.NewSearchParameters()
+	msgs, err := s.Client.SearchMessages(term, prefs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// log.Println("Messages: ", msgs)
+
+	// Construct the messages
+	var messages []components.Message
+	var ids []string
+	for _, message := range msgs.Matches {
+		// Parse time
+		floatTime, err := strconv.ParseFloat(message.Timestamp, 64)
+		if err != nil {
+			floatTime = 0.0
+		}
+		intTime := int64(floatTime)
+
+		// Format message
+		msg := components.Message{
+			ID:          message.Channel.ID + message.User + message.Timestamp,
+			Messages:    make(map[string]components.Message),
+			Time:        time.Unix(intTime, 0),
+			RawTs:       message.Timestamp,
+			Name:        message.Username, // this gets formatted later
+			Content:     parseMessage(s, message.Text),
+			StyleTime:   s.Config.Theme.Message.Time,
+			StyleThread: s.Config.Theme.Message.Thread,
+			StyleName:   s.Config.Theme.Message.Name,
+			StyleText:   s.Config.Theme.Message.Text,
+			FormatTime:  s.Config.Theme.Message.TimeFormat,
+		}
+
+		if len(message.Attachments) > 0 {
+			log.Println("Attachments: ", message.Attachments)
+			atts := s.CreateMessageFromAttachments(message.Attachments)
+
+			for i, a := range atts {
+				msg.Messages[strconv.Itoa(i)] = a
+			}
+		}
+
+		if len(message.Files) > 0 {
+			log.Println("Files: ", message.Files)
+			files := s.CreateMessageFromFiles(message.Files)
+
+			for _, file := range files {
+				msg.Messages[file.ID] = file
+			}
+		}
+		ids = append(ids, message.Channel.ID)
+		messages = append(messages, msg)
+	}
+
+	// Reverse the order of the messages, we want the newest in
+	// the last place
+	var messagesReversed []components.Message
+	var idsReversed []string
+	for i := len(messages) - 1; i >= 0; i-- {
+		messagesReversed = append(messagesReversed, messages[i])
+		idsReversed = append(idsReversed, ids[i])
+	}
+
+	return messagesReversed, idsReversed, nil
+}
+
 // GetMessages will get messages for a channel, group or im channel delimited
 // by a count. It will return the messages, the thread identifiers
 // (as ChannelItem), and and error.
@@ -872,6 +940,7 @@ func (s *SlackService) CreateMessageFromFiles(files []slack.File) []components.M
 
 	for _, file := range files {
 		msgs = append(msgs, components.Message{
+			ID: file.ID,
 			Content: fmt.Sprintf(
 				"%s %s", file.Title, file.URLPrivate,
 			),

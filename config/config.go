@@ -139,7 +139,7 @@ func getDefaultConfig() Config {
 				"<left>":      "cursor-left",
 				"<right>":     "cursor-right",
 				"<escape>":    "clear-input",
-				"<enter>":     "clear-input",
+				"<enter>":     "chat-search",
 				"<backspace>": "backspace",
 				"C-8":         "backspace",
 				"<delete>":    "delete",

@@ -51,6 +51,7 @@ type SearchMessage struct {
 	Text        string       `json:"text"`
 	Permalink   string       `json:"permalink"`
 	Attachments []Attachment `json:"attachments"`
+	Files       []File       `json:"files"`
 	Previous    CtxMessage   `json:"previous"`
 	Previous2   CtxMessage   `json:"previous_2"`
 	Next        CtxMessage   `json:"next"`

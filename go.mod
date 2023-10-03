@@ -22,4 +22,4 @@ require (
 	gopkg.in/yaml.v2 v2.2.4 // indirect
 )
 
-replace github.com/slack-go/slack => github.com/Andrew-Collins/slack v0.12.4-0.20231003035340-c3be0235315d
+replace github.com/slack-go/slack => github.com/Andrew-Collins/slack v0.12.4-0.20231003124749-c8806ccdda49
