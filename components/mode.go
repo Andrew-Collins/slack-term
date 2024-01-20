@@ -8,6 +8,7 @@ const (
 	CommandMode = "NORMAL"
 	InsertMode  = "INSERT"
 	SearchMode  = "SEARCH"
+	YankMode    = "YANK"
 )
 
 // Mode is the definition of Mode component
@@ -100,7 +101,17 @@ func (m *Mode) SetCommandMode() {
 	termui.Render(m)
 }
 
-func (m *Mode) SetSearchMode() {
+func (m *Mode) SetChatSearchMode() {
 	m.Par.Text = SearchMode
+	termui.Render(m)
+}
+
+func (m *Mode) SetChanSearchMode() {
+	m.Par.Text = SearchMode
+	termui.Render(m)
+}
+
+func (m *Mode) SetYankMode() {
+	m.Par.Text = YankMode
 	termui.Render(m)
 }

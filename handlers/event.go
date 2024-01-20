@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -36,7 +37,9 @@ var actionMap = map[string]func(*context.AppContext){
 	"quit":                actionQuit,
 	"mode-insert":         actionInsertMode,
 	"mode-command":        actionCommandMode,
-	"mode-search":         actionSearchMode,
+	"mode-chan-search":    actionChanSearchMode,
+	"mode-chat-search":    actionChatSearchMode,
+	"mode-yank":           actionYankMode,
 	"clear-input":         actionClearInput,
 	"channel-up":          actionMoveCursorUpChannels,
 	"channel-down":        actionMoveCursorDownChannels,
@@ -47,7 +50,7 @@ var actionMap = map[string]func(*context.AppContext){
 	"channel-jump":        actionJumpChannels,
 	"chat-top":            actionMoveCursorTopChat,
 	"chat-bottom":         actionMoveCursorBottomChat,
-	"chat-search":         actionChatSearch,
+	// "chat-search":         actionChatSearch,
 	// "chat-search-next":    actionSearchNextChat,
 	// "chat-search-prev":    actionSearchPrevChat,
 	"thread-up":      actionMoveCursorUpThreads,
@@ -245,10 +248,14 @@ func actionKeyEvent(ctx *context.AppContext, ev termbox.Event) {
 			action(ctx)
 		}
 	} else {
-		if (ctx.Mode == context.InsertMode || ctx.Mode == context.SearchMode) && ev.Ch != 0 {
+		if ctx.Mode == context.InsertMode && ev.Ch != 0 {
 			actionInput(ctx.View, ev.Ch)
-		} else if ctx.Mode == context.SearchMode && ev.Ch != 0 {
+		} else if ctx.Mode == context.ChanSearchMode && ev.Ch != 0 {
 			actionChanSearch(ctx, ev.Ch)
+		} else if ctx.Mode == context.ChatSearchMode && ev.Ch != 0 {
+			actionChatSearch(ctx, ev.Ch)
+		} else if ctx.Mode == context.YankMode && ev.Ch != 0 {
+			actionYankLine(ctx, ev.Ch)
 		}
 	}
 }
@@ -335,6 +342,9 @@ func actionInput(view *views.View, key rune) {
 }
 
 func actionClearInput(ctx *context.AppContext) {
+	// Clear Idents
+	ctx.View.Chat.ClearIdents()
+	termui.Render(ctx.View.Chat)
 	// Clear input
 	ctx.View.Input.Clear()
 	ctx.View.Refresh()
@@ -366,6 +376,13 @@ func actionMoveCursorLeft(ctx *context.AppContext) {
 	ctx.View.Input.MoveCursorLeft()
 	termui.Render(ctx.View.Input)
 }
+
+// func actionDownload(ctx *context.AppContext) {
+//   cmd := exec.Command("wget", "-d", fmt.Sprint("--header=\"Authorization: Bearer", ctx.Config.SlackToken,"\""), fmt.Sprint(ctx.View.Chat.Messages))
+//   cmd.
+//
+//
+// }
 
 func actionSend(ctx *context.AppContext) {
 	if !ctx.View.Input.IsEmpty() {
@@ -437,24 +454,47 @@ func actionSend(ctx *context.AppContext) {
 	}
 }
 
-func actionChatSearch(ctx *context.AppContext) {
-	// Only actually search when the time expires
-	term := ctx.View.Input.GetText()
-	ctx.View.Input.Clear()
-	termui.Render(ctx.View.Input)
-	msgs, chanIDs, err := ctx.Service.SearchMessages(term)
-	if err == nil {
-		for i, id := range chanIDs {
-			ind := ctx.View.Channels.FindChannel(id)
-			msgs[i].Name = ctx.View.Channels.ChannelItems[ind].Name + "/" + msgs[i].Name
-		}
-		ctx.View.Chat.SetMessages(msgs)
+func actionYankLine(ctx *context.AppContext, key rune) {
+	actionInput(ctx.View, key)
+
+	ind := ctx.View.Chat.SetIdents(key)
+	if ind >= 0 {
+		cmd := exec.Command("wl-copy", ctx.View.Chat.MessagesSorted[ind].Content)
+		cmd.Run()
+		actionClearInput(ctx)
 	}
 
-	ctx.View.Chat.SetBorderLabel(
-		"Search:'" + term + "'",
-	)
 	termui.Render(ctx.View.Chat)
+}
+
+func actionChatSearch(ctx *context.AppContext, key rune) {
+	actionInput(ctx.View, key)
+	go func() {
+		if scrollTimer != nil {
+			scrollTimer.Stop()
+		}
+
+		scrollTimer = time.NewTimer(time.Second / 4)
+		<-scrollTimer.C
+
+		// Only actually search when the time expires
+		term := ctx.View.Input.GetText()
+		ctx.View.Input.Clear()
+		termui.Render(ctx.View.Input)
+		msgs, chanIDs, err := ctx.Service.SearchMessages(term)
+		if err == nil {
+			for i, id := range chanIDs {
+				ind := ctx.View.Channels.FindChannel(id)
+				msgs[i].Name = ctx.View.Channels.ChannelItems[ind].Name + "/" + msgs[i].Name
+			}
+			ctx.View.Chat.SetMessages(msgs)
+		}
+
+		ctx.View.Chat.SetBorderLabel(
+			"Search:'" + term + "'",
+		)
+		termui.Render(ctx.View.Chat)
+	}()
 }
 
 // actionChanSearch will search through the channels based on the users
@@ -497,9 +537,21 @@ func actionCommandMode(ctx *context.AppContext) {
 	ctx.View.Mode.SetCommandMode()
 }
 
-func actionSearchMode(ctx *context.AppContext) {
-	ctx.Mode = context.SearchMode
-	ctx.View.Mode.SetSearchMode()
+func actionChanSearchMode(ctx *context.AppContext) {
+	ctx.Mode = context.ChanSearchMode
+	ctx.View.Mode.SetChanSearchMode()
+}
+
+func actionChatSearchMode(ctx *context.AppContext) {
+	ctx.Mode = context.ChatSearchMode
+	ctx.View.Mode.SetChatSearchMode()
+}
+
+func actionYankMode(ctx *context.AppContext) {
+	ctx.View.Chat.SetIdents(rune(0))
+	termui.Render(ctx.View.Chat)
+	ctx.Mode = context.YankMode
+	ctx.View.Mode.SetYankMode()
 }
 
 func actionGetMessages(ctx *context.AppContext) {

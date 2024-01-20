@@ -38,6 +38,15 @@ type Message struct {
 	FormatTime string
 
 	Lines []Line
+	Link  string
+}
+
+func (m Message) GetLink() string {
+	return fmt.Sprintf(
+		"[[%s]](%s) ",
+		m.Link,
+		m.StyleText,
+	)
 }
 
 func (m Message) GetTime() string {

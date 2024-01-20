@@ -106,7 +106,8 @@ func getDefaultConfig() Config {
 		KeyMap: map[string]keyMapping{
 			"command": {
 				"i":          "mode-insert",
-				"/":          "mode-search",
+				"/":          "mode-chat-search",
+				"?":          "mode-chan-search",
 				"k":          "channel-up",
 				"j":          "channel-down",
 				"g":          "channel-top",
@@ -124,6 +125,7 @@ func getDefaultConfig() Config {
 				"'":          "channel-jump",
 				"q":          "quit",
 				"<f1>":       "help",
+				"y":          "mode-yank",
 			},
 			"insert": {
 				"<left>":      "cursor-left",
@@ -135,15 +137,29 @@ func getDefaultConfig() Config {
 				"<delete>":    "delete",
 				"<space>":     "space",
 			},
-			"search": {
+			"chat_search": {
 				"<left>":      "cursor-left",
 				"<right>":     "cursor-right",
 				"<escape>":    "clear-input",
-				"<enter>":     "chat-search",
+				"<enter>":     "clear-input",
 				"<backspace>": "backspace",
 				"C-8":         "backspace",
 				"<delete>":    "delete",
 				"<space>":     "space",
+			},
+			"chan_search": {
+				"<left>":      "cursor-left",
+				"<right>":     "cursor-right",
+				"<escape>":    "clear-input",
+				"<enter>":     "clear-input",
+				"<backspace>": "backspace",
+				"C-8":         "backspace",
+				"<delete>":    "delete",
+				"<space>":     "space",
+			},
+			"yank": {
+				"<escape>": "clear-input",
+				"<enter>":  "clear-input",
 			},
 		},
 		Theme: Theme{

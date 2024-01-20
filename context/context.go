@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	CommandMode = "command"
-	InsertMode  = "insert"
-	SearchMode  = "search"
+	CommandMode    = "command"
+	InsertMode     = "insert"
+	ChanSearchMode = "chan_search"
+	ChatSearchMode = "chat_search"
+	YankMode       = "yank"
 
 	ChatFocus = iota
 	ThreadFocus

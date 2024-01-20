@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 
 	"github.com/erroneousboat/slack-term/config"
+	// "github.com/adrg/xdg"
 )
 
 // Chat is the definition of a Chat component
@@ -104,6 +106,7 @@ func (c *Chat) Buffer() termui.Buffer {
 	// backwards and for every line it'll set the cell in that line.
 	// Offset is the number which allows us to begin printing the
 	// line above the last line.
+
 	buf := c.List.Buffer()
 	paneMinY := c.List.InnerBounds().Min.Y
 	paneMaxY := c.List.InnerBounds().Max.Y
@@ -188,6 +191,60 @@ func (c *Chat) SetX(x int) {
 // SetY implements interface termui.GridBufferer
 func (c *Chat) SetY(y int) {
 	c.List.SetY(y)
+}
+
+func CalcLink(i int) string {
+	base_links := []string{"a", "s", "d", "f", "g", "h", "j", "k", "l", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "z", "x", "c", "v", "b", "n", "m"}
+	base_len := len(base_links)
+	link := ""
+	for i >= 0 {
+		ind := i % base_len
+		link = link + base_links[ind]
+		if i > base_len {
+			i -= base_len
+		} else {
+			i = -1
+		}
+	}
+	return link
+}
+
+func (c *Chat) ClearIdents() {
+	for i, msg := range c.MessagesSorted {
+		msg.Link = ""
+		c.MessagesSorted[i] = msg
+	}
+}
+
+func (c *Chat) SetIdents(input rune) int {
+	link_cnt := 0
+	last_link := -1
+	line_cnt := 0
+	j := 0
+	for i := len(c.MessagesSorted) - 1; i >= 0; i-- {
+		msg := c.MessagesSorted[i]
+		if input == rune(0) {
+			msg.Link = CalcLink(j)
+		} else if rune(msg.Link[0]) == input {
+			link_cnt += 1
+			last_link = i
+			msg.Link = msg.Link[1:]
+		} else {
+			msg.Link = ""
+		}
+		msg.Lines = c.MessageToLines(msg)
+		line_cnt += len(msg.Lines)
+		c.MessagesSorted[i] = msg
+		if line_cnt >= c.GetMaxItems() {
+			break
+		}
+		j += 1
+	}
+	if link_cnt == 1 {
+		return last_link
+	} else {
+		return -1
+	}
 }
 
 // GetMaxItems return the maximal amount of items can fit in the Chat
@@ -449,6 +506,16 @@ func (c *Chat) MessagesToCells(msgs []Message) []termui.Cell {
 // will interpret potential markdown usage in a message as well.
 func (c *Chat) MessageToCells(msg Message) []termui.Cell {
 	cells := make([]termui.Cell, 0)
+
+	if msg.Link != "" {
+		log.Println("Link: ", msg.Link)
+		log.Println("Format Link: ", msg.GetLink())
+
+		cells = append(cells, termui.DefaultTxBuilder.Build(
+			msg.GetLink(),
+			termui.ColorDefault, termui.ColorDefault)...,
+		)
+	}
 
 	// When msg.Time and msg.Name are empty (in the case of attachments)
 	// don't add the time and name parts.
