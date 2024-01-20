@@ -53,6 +53,7 @@ func CreateView(config *config.Config, svc *service.SlackService) (*View, error)
 
 	// Chat: set messages in component
 	chat.SetMessages(msgs)
+	chat.SetUserNameStyle(svc.CurrentUsername)
 
 	chat.SetBorderLabel(
 		channels.ChannelItems[channels.SelectedChannel].GetChannelName(),

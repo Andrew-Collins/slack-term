@@ -36,6 +36,8 @@ type Message struct {
 	StyleText   string
 
 	FormatTime string
+
+	Lines []Line
 }
 
 func (m Message) GetTime() string {

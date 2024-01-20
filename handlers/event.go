@@ -161,6 +161,7 @@ func messageHandler(ctx *context.AppContext) {
 						}
 
 						ctx.View.Chat.SetMessages(msgs)
+						ctx.View.Chat.SetUserNameStyle(ctx.Service.CurrentUsername)
 
 						if len(thr) > 0 {
 
@@ -398,7 +399,7 @@ func actionSend(ctx *context.AppContext) {
 						err.Error(),
 					)
 				}
-
+				ctx.View.Chat.AddRawMessage(message, ctx.Service.CurrentUsername, "")
 			}
 
 			if ctx.Focus == context.ThreadFocus {
@@ -412,7 +413,14 @@ func actionSend(ctx *context.AppContext) {
 						err.Error(),
 					)
 				}
+				ctx.View.Chat.AddRawMessage(message, ctx.Service.CurrentUsername, "  ")
 			}
+			// if ctx.Focus == context.ThreadFocus {
+			// 	ctx.View.Chat.AddReply(msgs[0].ID, msgs[0])
+			// } else {
+			// Add the message to buffer
+			termui.Render(ctx.View.Chat)
+			// }
 		}
 
 		// Clear notification icon if there is any
@@ -424,6 +432,7 @@ func actionSend(ctx *context.AppContext) {
 			)
 			ctx.View.Channels.MarkAsRead(ctx.View.Channels.SelectedChannel)
 		}
+
 		termui.Render(ctx.View.Channels)
 	}
 }
@@ -506,6 +515,7 @@ func actionGetMessages(ctx *context.AppContext) {
 	}
 
 	ctx.View.Chat.SetMessages(msgs)
+	ctx.View.Chat.SetUserNameStyle(ctx.Service.CurrentUsername)
 
 	termui.Render(ctx.View.Chat)
 }
@@ -594,6 +604,7 @@ func actionChangeChannel(ctx *context.AppContext) {
 
 	// Set messages for the channel
 	ctx.View.Chat.SetMessages(msgs)
+	ctx.View.Chat.SetUserNameStyle(ctx.Service.CurrentUsername)
 
 	// Set the threads identifiers in the threads pane
 	var haveThreads bool
@@ -683,6 +694,7 @@ func actionChangeThread(ctx *context.AppContext) {
 
 	// Set messages for the channel
 	ctx.View.Chat.SetMessages(msgs)
+	ctx.View.Chat.SetUserNameStyle(ctx.Service.CurrentUsername)
 
 	termui.Render(ctx.View.Channels)
 	termui.Render(ctx.View.Threads)
