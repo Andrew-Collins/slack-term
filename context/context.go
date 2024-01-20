@@ -21,6 +21,7 @@ const (
 	ChanSearchMode = "chan_search"
 	ChatSearchMode = "chat_search"
 	YankMode       = "yank"
+	DownloadMode   = "download"
 
 	ChatFocus = iota
 	ThreadFocus

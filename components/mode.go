@@ -5,10 +5,11 @@ import (
 )
 
 const (
-	CommandMode = "NORMAL"
-	InsertMode  = "INSERT"
-	SearchMode  = "SEARCH"
-	YankMode    = "YANK"
+	CommandMode  = "NORMAL"
+	InsertMode   = "INSERT"
+	SearchMode   = "SEARCH"
+	YankMode     = "YANK"
+	DownloadMode = "DOWN"
 )
 
 // Mode is the definition of Mode component
@@ -113,5 +114,10 @@ func (m *Mode) SetChanSearchMode() {
 
 func (m *Mode) SetYankMode() {
 	m.Par.Text = YankMode
+	termui.Render(m)
+}
+
+func (m *Mode) SetDownloadMode() {
+	m.Par.Text = DownloadMode
 	termui.Render(m)
 }

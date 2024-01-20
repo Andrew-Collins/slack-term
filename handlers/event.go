@@ -40,6 +40,7 @@ var actionMap = map[string]func(*context.AppContext){
 	"mode-chan-search":    actionChanSearchMode,
 	"mode-chat-search":    actionChatSearchMode,
 	"mode-yank":           actionYankMode,
+	"mode-download":       actionDownloadMode,
 	"clear-input":         actionClearInput,
 	"channel-up":          actionMoveCursorUpChannels,
 	"channel-down":        actionMoveCursorDownChannels,
@@ -254,8 +255,8 @@ func actionKeyEvent(ctx *context.AppContext, ev termbox.Event) {
 			actionChanSearch(ctx, ev.Ch)
 		} else if ctx.Mode == context.ChatSearchMode && ev.Ch != 0 {
 			actionChatSearch(ctx, ev.Ch)
-		} else if ctx.Mode == context.YankMode && ev.Ch != 0 {
-			actionYankLine(ctx, ev.Ch)
+		} else if (ctx.Mode == context.YankMode || ctx.Mode == context.DownloadMode) && ev.Ch != 0 {
+			actionLine(ctx, ev.Ch)
 		}
 	}
 }
@@ -454,13 +455,28 @@ func actionSend(ctx *context.AppContext) {
 	}
 }
 
-func actionYankLine(ctx *context.AppContext, key rune) {
+func actionLine(ctx *context.AppContext, key rune) {
 	actionInput(ctx.View, key)
 
-	ind := ctx.View.Chat.SetIdents(key)
-	if ind >= 0 {
-		cmd := exec.Command("wl-copy", ctx.View.Chat.MessagesSorted[ind].Content)
-		cmd.Run()
+	ind := ctx.View.Chat.SetIdents(key, ctx.Mode)
+	if ind[0] != "" {
+		msg := ctx.View.Chat.Messages[ind[0]]
+		if ind[1] != "" {
+			msg = msg.Messages[ind[1]]
+		}
+		cmd := exec.Command("echo")
+		if ctx.Mode == context.YankMode {
+			cmd = exec.Command("wl-copy", msg.Content)
+		} else if ctx.Mode == context.DownloadMode {
+			split := strings.Split(msg.Content, " ")
+			h_dir, _ := os.UserHomeDir()
+			d_dir := h_dir + "/Downloads/"
+			cmd = exec.Command("wget", "-d", fmt.Sprint("--header=Authorization: Bearer ", ctx.Config.SlackXoxpToken), "-P", d_dir, split[len(split)-1])
+		}
+		err := cmd.Run()
+		if err != nil {
+			log.Println(err)
+		}
 		actionClearInput(ctx)
 	}
 
@@ -547,11 +563,18 @@ func actionChatSearchMode(ctx *context.AppContext) {
 	ctx.View.Mode.SetChatSearchMode()
 }
 
-func actionYankMode(ctx *context.AppContext) {
-	ctx.View.Chat.SetIdents(rune(0))
+func actionDownloadMode(ctx *context.AppContext) {
+	ctx.Mode = context.DownloadMode
+	ctx.View.Mode.SetDownloadMode()
+	ctx.View.Chat.SetIdents(rune(0), ctx.Mode)
 	termui.Render(ctx.View.Chat)
+}
+
+func actionYankMode(ctx *context.AppContext) {
 	ctx.Mode = context.YankMode
 	ctx.View.Mode.SetYankMode()
+	ctx.View.Chat.SetIdents(rune(0), ctx.Mode)
+	termui.Render(ctx.View.Chat)
 }
 
 func actionGetMessages(ctx *context.AppContext) {

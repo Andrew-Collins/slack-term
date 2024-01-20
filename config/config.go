@@ -21,6 +21,7 @@ const (
 type Config struct {
 	SlackToken     string                `json:"slack_token"`
 	SlackXoxdToken string                `json:"slack_xoxd_token"`
+	SlackXoxpToken string                `json:"slack_xoxp_token"`
 	Notify         string                `json:"notify"`
 	Emoji          bool                  `json:"emoji"`
 	SidebarWidth   int                   `json:"sidebar_width"`
@@ -126,6 +127,7 @@ func getDefaultConfig() Config {
 				"q":          "quit",
 				"<f1>":       "help",
 				"y":          "mode-yank",
+				"d":          "mode-download",
 			},
 			"insert": {
 				"<left>":      "cursor-left",
@@ -158,6 +160,10 @@ func getDefaultConfig() Config {
 				"<space>":     "space",
 			},
 			"yank": {
+				"<escape>": "clear-input",
+				"<enter>":  "clear-input",
+			},
+			"download": {
 				"<escape>": "clear-input",
 				"<enter>":  "clear-input",
 			},

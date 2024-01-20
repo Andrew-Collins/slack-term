@@ -216,34 +216,68 @@ func (c *Chat) ClearIdents() {
 	}
 }
 
-func (c *Chat) SetIdents(input rune) int {
-	link_cnt := 0
-	last_link := -1
-	line_cnt := 0
-	j := 0
+type IdentRun struct {
+	link_cnt  int
+	last_link [2]string
+	line_cnt  int
+	j         int
+	mode      string
+	input     rune
+}
+
+func (c *Chat) RunIdent(msg Message, run IdentRun, i string, j string) (Message, IdentRun) {
+	run.line_cnt += len(msg.Lines)
+	// if run.mode == "download" && j == "" {
+	if run.mode == "download" && (len(j) < 5 || !strings.Contains(msg.Content, "files.slack")) {
+		return msg, run
+	}
+	log.Println("i: ", i, "j: ", j, "cont: ", msg.Content)
+	if run.input == rune(0) {
+		msg.Link = CalcLink(run.j)
+		run.j += 1
+	} else if rune(msg.Link[0]) == run.input {
+		run.link_cnt += 1
+		run.last_link[0] = i
+		run.last_link[1] = j
+		msg.Link = msg.Link[1:]
+	} else {
+		msg.Link = ""
+	}
+	msg.Lines = c.MessageToLines(msg)
+	return msg, run
+}
+
+func (c *Chat) SetIdents(input rune, mode string) [2]string {
+	var run IdentRun
+	run.line_cnt = 0
+	run.link_cnt = 0
+	run.last_link = [2]string{"", ""}
+	run.j = 0
+	run.input = input
+	run.mode = mode
 	for i := len(c.MessagesSorted) - 1; i >= 0; i-- {
 		msg := c.MessagesSorted[i]
-		if input == rune(0) {
-			msg.Link = CalcLink(j)
-		} else if rune(msg.Link[0]) == input {
-			link_cnt += 1
-			last_link = i
-			msg.Link = msg.Link[1:]
-		} else {
-			msg.Link = ""
+		msg, new_run := c.RunIdent(msg, run, msg.ID, "")
+		run = new_run
+		ran_sub := false
+		for key, sub := range msg.Messages {
+			ran_sub = true
+			new_sub, new_run := c.RunIdent(sub, run, msg.ID, key)
+			run = new_run
+			msg.Messages[key] = new_sub
 		}
-		msg.Lines = c.MessageToLines(msg)
-		line_cnt += len(msg.Lines)
+		if ran_sub {
+			msg.Lines = c.MessageToLines(msg)
+		}
 		c.MessagesSorted[i] = msg
-		if line_cnt >= c.GetMaxItems() {
+		if run.line_cnt >= c.GetMaxItems() {
 			break
 		}
-		j += 1
 	}
-	if link_cnt == 1 {
-		return last_link
+	if run.link_cnt == 1 {
+		return run.last_link
 	} else {
-		return -1
+		return [2]string{"", ""}
 	}
 }
 
@@ -508,9 +542,6 @@ func (c *Chat) MessageToCells(msg Message) []termui.Cell {
 	cells := make([]termui.Cell, 0)
 
 	if msg.Link != "" {
-		log.Println("Link: ", msg.Link)
-		log.Println("Format Link: ", msg.GetLink())
-
 		cells = append(cells, termui.DefaultTxBuilder.Build(
 			msg.GetLink(),
 			termui.ColorDefault, termui.ColorDefault)...,
